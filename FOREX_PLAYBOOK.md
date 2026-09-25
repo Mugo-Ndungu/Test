@@ -209,25 +209,34 @@ journal do.
 
 ## 9. Using `fx_scanner.py`
 
+The scanner runs the whole morning routine for you:
+
+| Step | What it does |
+|---|---|
+| **1. News** | Downloads this week's ForexFactory calendar, lists today's **high-impact (red)** events with a no-entry window of ±15 minutes, and flags any pick that is inside a window right now |
+| **2. Strength** | Ranks USD, EUR, GBP, JPY, AUD, NZD, CAD, CHF by today's move. Top 3 = strong, bottom 3 = weak. Only **strong vs weak** pairs pass; strong/strong, weak/weak and anything with a neutral currency are skipped |
+| **3. ADR** | Skips any pair that has already used **75 %** or more of its 14-day average daily range |
+| **4. Levels** | For each pick: Asian high/low, previous-day high/low, previous-week high/low, nearest round numbers above and below |
+| **5. Picks** | Takes the best 2–3 passing pairs and skips any that repeat a trade already picked: same currency on the same side (e.g. short USD twice) or daily returns correlated above 0.7 |
+
 ```bash
 pip install yfinance pandas numpy
 
-python fx_scanner.py                          # scan default pairs: strength + watchlist + levels
-python fx_scanner.py EURUSD GBPJPY XAUUSD     # scan your own pairs
-python fx_scanner.py --demo                   # offline demo with synthetic data
+python fx_scanner.py                          # full morning scan (20 pairs + gold)
+python fx_scanner.py EURUSD GBPJPY XAUUSD     # only consider these pairs
+python fx_scanner.py --max-adr 70 --picks 2   # stricter
+python fx_scanner.py --news-window 30         # wider no-trade window around news
+python fx_scanner.py --demo                   # offline demo with synthetic prices and news
 
 python fx_scanner.py size --account 2000 --risk 1 --stop 15 --pair EURUSD
 python fx_scanner.py size --account 2000 --risk 1 --stop 25 --pair USDJPY --price 148.50
 python fx_scanner.py size --account 2000 --risk 1 --stop 20 --pair EURGBP --quote-usd 1.34
 ```
 
-Run the scan around **06:15–06:45 UTC** (before London) and again around **11:45 UTC**
-(before the overlap). It prints:
+Run it around **06:15–06:45 UTC** (before London) and again around **11:45 UTC**
+(before the overlap). The calendar is cached for an hour in `.fx_cache/` because the
+feed limits how often it can be downloaded. If it can't be reached, the scanner says
+so and you must check forexfactory.com yourself.
 
-1. **Currency strength ranking** for today (USD, EUR, GBP, JPY, AUD, NZD, CAD, CHF).
-2. **Watchlist**, ranked by strength gap and ADR room: today's change, ADR in pips,
-   % of ADR used, daily trend, and a suggested setup.
-3. **Key levels** for each pair: Asian high/low, previous-day high/low, today's open.
-
-Data comes from Yahoo Finance and can be delayed or differ slightly from your broker —
-always confirm levels on your MT5 chart before trading.
+Prices come from Yahoo Finance and can be delayed or differ slightly from your broker,
+so confirm levels on your MT5 chart before trading.
