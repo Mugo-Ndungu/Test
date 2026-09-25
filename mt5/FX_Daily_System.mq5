@@ -2,6 +2,7 @@
 //| FX_Daily_System.mq5                                              |
 //| Forex morning routine inside MetaTrader 5, in Nairobi time (EAT).|
 //|                                                                  |
+//|  0. Your daily bias from the Bias Scorecard filters every pick    |
 //|  1. Red (high-impact) news from the MT5 economic calendar, with  |
 //|     no-entry windows                                             |
 //|  2. Currency strength: only strong-vs-weak pairs pass            |
@@ -19,6 +20,9 @@
 input group "Pairs"
 input string InpPairs        = "EURUSD,GBPUSD,AUDUSD,NZDUSD,USDJPY,USDCAD,USDCHF,EURGBP,EURJPY,GBPJPY,AUDJPY,EURAUD,GBPAUD,EURCHF,CADJPY,AUDNZD,GBPCAD,NZDJPY,CHFJPY,EURCAD,XAUUSD"; // Pairs (use PAIR=SYMBOL if your broker names differ, e.g. XAUUSD=GOLD)
 input string InpSuffix       = "";     // Broker symbol suffix, e.g. m or .pro
+input group "Daily bias (from the Bias Scorecard)"
+input string InpBias         = "";     // Paste today's bias, e.g. USD+6,EUR-2,GBP+1,JPY-5,AUD+3,NZD+1,CAD0,CHF-2
+input double InpMinBias      = 3;      // Minimum pair bias (base minus quote) to allow a pick
 input group "Rules"
 input double InpMaxAdrUsed   = 75;     // Skip pairs that used this % of ADR
 input int    InpAdrDays      = 14;     // ADR period (days)
@@ -60,6 +64,7 @@ struct PairInfo
    string            status;
    double            asianHi, asianLo, pdh, pdl, pwh, pwl, roundUp, roundDn;
    double            stopPips, lots;
+   double            bias;      // your daily bias for the pair: base minus quote
   };
 
 struct NewsItem
@@ -74,6 +79,8 @@ PairInfo P[];
 int      Picks[];
 double   Strength[8];
 string   Tier[8];
+double   Bias[8];
+bool     HasBias = false;
 NewsItem News[];
 datetime LastNewsLoad = 0;
 bool     NewsOk = false;
@@ -258,6 +265,42 @@ int NextNews(string pair, datetime now)
    return -1;
   }
 
+//--- daily bias -------------------------------------------------------
+// Parses "USD+6,EUR-2,..." from the Bias Scorecard into Bias[]
+void ParseBias()
+  {
+   ArrayInitialize(Bias, 0);
+   HasBias = false;
+   string parts[];
+   int n = StringSplit(InpBias, ',', parts);
+   for(int i = 0; i < n; i++)
+     {
+      string token = parts[i];
+      StringTrimLeft(token);
+      StringTrimRight(token);
+      StringToUpper(token);
+      if(StringLen(token) < 4)
+         continue;
+      int c = CurIndex(StringSubstr(token, 0, 3));
+      if(c < 0)
+         continue;
+      string num = StringSubstr(token, 3);
+      if(StringGetCharacter(num, 0) == '+')
+         num = StringSubstr(num, 1);
+      Bias[c] = StringToDouble(num);
+      HasBias = true;
+     }
+  }
+
+double PairBias(string pair)
+  {
+   int b = CurIndex(Base(pair)), q = CurIndex(Quote(pair));
+   if(q < 0)
+      return 0;
+   // gold has no score of its own: it moves against the quote currency (USD)
+   return (b >= 0 ? Bias[b] : 0) - Bias[q];
+  }
+
 //--- 2. strength ------------------------------------------------------
 void UpdateStrength()
   {
@@ -377,7 +420,8 @@ bool Analyze(PairInfo &p)
    p.gap = (b >= 0 ? Strength[b] : 0) - (q >= 0 ? Strength[q] : 0);
    bool aligned = (p.trend == "up" && p.dir > 0) || (p.trend == "down" && p.dir < 0);
    p.counter = p.dir != 0 && !aligned;
-   p.score = MathAbs(p.gap) * 10 + MathMax(0.0, 100 - p.usedPct) / 20 + (aligned ? 2 : 0);
+   p.bias = PairBias(p.pair);
+   p.score = MathAbs(p.gap) * 10 + MathMax(0.0, 100 - p.usedPct) / 20 + (aligned ? 2 : 0) + MathAbs(p.bias) / 2;
 
    p.status = "PASS";
    if(p.dir == 0)
@@ -385,6 +429,12 @@ bool Analyze(PairInfo &p)
    else
       if(p.usedPct >= InpMaxAdrUsed)
          p.status = StringFormat("skip: %.0f%% of ADR used", p.usedPct);
+      else
+         if(HasBias && p.bias * p.dir < 0)
+            p.status = StringFormat("skip: against your daily bias (%+.0f)", p.bias);
+         else
+            if(HasBias && MathAbs(p.bias) < InpMinBias)
+               p.status = StringFormat("skip: daily bias too weak (%+.0f)", p.bias);
 
    p.stopPips = MathMax(5.0, p.adrPips * InpStopAdrPct / 100);
    p.lots = LotsFor(s, p.stopPips * p.pip);
@@ -651,7 +701,16 @@ void DrawPanel()
    else
       if(DayTrades >= InpMaxTrades)
          risk += "   >>> MAX TRADES - NO MORE ENTRIES <<<";
-   t += risk + "\n\n";
+   t += risk + "\n";
+   if(HasBias)
+     {
+      string b = "Your daily bias: ";
+      for(int i = 0; i < 8; i++)
+         b += StringFormat("%s %+.0f  ", Currencies[i], Bias[i]);
+      t += b + StringFormat("(picks need %.0f+ in their direction)\n\n", InpMinBias);
+     }
+   else
+      t += "No daily bias entered. Fill in the Bias Scorecard and paste it into the InpBias input.\n\n";
 
    t += "1. RED NEWS TODAY (MT5 calendar, Nairobi time)\n";
    if(!NewsOk)
@@ -700,8 +759,9 @@ void DrawPanel()
    for(int k = 0; k < ArraySize(Picks); k++)
      {
       PairInfo p = P[Picks[k]];
-      t += StringFormat("   %d) %s %s @ %s   ADR %.0f pips, %.0f%% used, trend %s%s\n", k + 1, p.pair,
+      t += StringFormat("   %d) %s %s @ %s   ADR %.0f pips, %.0f%% used, trend %s%s%s\n", k + 1, p.pair,
                         p.dir > 0 ? "BUY" : "SELL", Px(p, p.price), p.adrPips, p.usedPct, p.trend,
+                        HasBias ? StringFormat(", bias %+.0f", p.bias) : "",
                         p.counter ? " (counter-trend: half size)" : "");
       t += StringFormat("      Asian H %s / L %s | Prev-day H %s / L %s | Prev-week H %s / L %s | Round %s / %s\n",
                         Px(p, p.asianHi), Px(p, p.asianLo), Px(p, p.pdh), Px(p, p.pdl), Px(p, p.pwh), Px(p, p.pwl),
@@ -856,6 +916,7 @@ int OnInit()
       P[k].valid = false;
       P[k].status = "";
      }
+   ParseBias();
    EventSetTimer(60);
    Refresh();
    return INIT_SUCCEEDED;

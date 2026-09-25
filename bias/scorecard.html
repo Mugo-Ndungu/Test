@@ -1,0 +1,427 @@
+<title>FX Bias Scorecard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #eef2f1;
+  --surface: #ffffff;
+  --ink: #15201c;
+  --muted: #5b6a64;
+  --line: #d3dcd8;
+  --accent: #1d5b86;
+  --accent-soft: #dce8f1;
+  --bull: #1b7a4c;
+  --bull-soft: #d9efe3;
+  --bear: #b23a30;
+  --bear-soft: #f6dedb;
+  --flat: #8a9690;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e1412;
+    --surface: #16201c;
+    --ink: #e4ebe8;
+    --muted: #93a39c;
+    --line: #2a3833;
+    --accent: #72aede;
+    --accent-soft: #1b2e3c;
+    --bull: #4fc58c;
+    --bull-soft: #173327;
+    --bear: #f0776b;
+    --bear-soft: #3a1f1c;
+    --flat: #6b7a74;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e1412;
+  --surface: #16201c;
+  --ink: #e4ebe8;
+  --muted: #93a39c;
+  --line: #2a3833;
+  --accent: #72aede;
+  --accent-soft: #1b2e3c;
+  --bull: #4fc58c;
+  --bull-soft: #173327;
+  --bear: #f0776b;
+  --bear-soft: #3a1f1c;
+  --flat: #6b7a74;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 15px/1.5 var(--body);
+  padding-inline: 16px;
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: 2.4rem; letter-spacing: 0.01em; }
+h2 { font-size: 1.55rem; }
+h3 { font-size: 1.2rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* header */
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+.clock { display: grid; gap: 4px; text-align: right; }
+.clock .time { font-family: var(--mono); font-size: 1.6rem; }
+.chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: var(--accent-soft); color: var(--accent); }
+.chip.live { background: var(--bull-soft); color: var(--bull); }
+.example { background: var(--accent-soft); border-radius: 8px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+
+/* summary */
+.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.summary > *, .layer > *, .notes > * { min-width: 0; }
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: 38px 1fr 42px; gap: 8px; align-items: center; }
+.bar .code { font-family: var(--mono); font-weight: 500; }
+.track { position: relative; height: 14px; background: var(--ground); border-radius: 3px; }
+.track::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; transition: all 0.25s ease; }
+.fill.pos { left: 50%; background: var(--bull); }
+.fill.neg { right: 50%; background: var(--bear); }
+.bar .val { text-align: right; }
+.pairs { display: grid; gap: 8px; align-content: start; }
+.pair { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.pair strong { font-family: var(--display); font-size: 1.35rem; font-weight: 600; letter-spacing: 0.02em; }
+.pair .side-buy { color: var(--bull); }
+.pair .side-sell { color: var(--bear); }
+.pair .grade { justify-self: end; align-self: center; }
+.pair small { color: var(--muted); grid-column: 1 / -1; }
+.none { color: var(--muted); }
+.mt5 { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.mt5 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mt5 code { font-family: var(--mono); font-size: 0.9rem; background: var(--ground); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; flex: 1 1 260px; min-width: 0; user-select: all; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 6px; padding: 8px 14px; font-weight: 600; }
+.btn.ghost { background: transparent; color: var(--accent); }
+
+/* layers */
+.layers { display: grid; gap: 14px; }
+.layer { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; }
+.layer-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.weight { font-family: var(--mono); font-size: 0.85rem; color: var(--accent); }
+.when { font-size: 0.85rem; color: var(--muted); }
+.tools { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.9rem; font-weight: 500; }
+.how { color: var(--muted); font-size: 0.92rem; max-width: 70ch; }
+.cells { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+.cell { border: 1px solid var(--line); background: var(--ground); border-radius: 6px; padding: 6px 0 4px; display: grid; justify-items: center; gap: 0; line-height: 1.2; }
+.cell .c { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.cell .s { font-family: var(--display); font-size: 1.35rem; font-weight: 700; color: var(--flat); }
+.cell[data-v="1"] { background: var(--bull-soft); border-color: var(--bull); }
+.cell[data-v="1"] .s { color: var(--bull); }
+.cell[data-v="-1"] { background: var(--bear-soft); border-color: var(--bear); }
+.cell[data-v="-1"] .s { color: var(--bear); }
+.cell[disabled] { cursor: default; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 6px 14px; font-weight: 600; font-size: 0.9rem; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+
+/* notes */
+.notes { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.note { border-top: 2px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.rules { color: var(--muted); font-size: 0.9rem; }
+@media (max-width: 600px) { .clock { text-align: left; } }
+@media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="label">Forex · Nairobi (EAT)</div>
+      <h1>Bias Scorecard</h1>
+      <p class="num" id="today"></p>
+    </div>
+    <div class="clock" aria-live="polite">
+      <span class="time" id="clock">--:--</span>
+      <span><span class="chip" id="session">Session</span></span>
+    </div>
+  </header>
+
+  <div class="example" id="exampleBanner" hidden>
+    <span>These are <strong>example scores</strong>. Clear them and score today's market.</span>
+    <button class="btn" id="clearBtn" type="button">Start today's sheet</button>
+  </div>
+
+  <section class="summary" aria-labelledby="sumTitle">
+    <div class="bars">
+      <h2 id="sumTitle">Currency bias</h2>
+      <p class="rules">Each currency scores −10 to +10 across the seven layers below.</p>
+      <div id="bars"></div>
+    </div>
+    <div class="pairs">
+      <h2>Pairs to focus on</h2>
+      <p class="rules">Strongest against weakest. Pair bias = base score minus quote score.</p>
+      <div id="pairs"></div>
+    </div>
+    <div class="mt5">
+      <div class="label">Paste into MT5 → FX_Daily_System → InpBias</div>
+      <div class="row">
+        <code id="mt5str"></code>
+        <button class="btn" id="copyBtn" type="button">Copy</button>
+      </div>
+      <p class="rules" id="copyMsg">MT5 then only picks pairs whose bias is 3 or more in the trade's direction.</p>
+    </div>
+  </section>
+
+  <section class="layers" aria-labelledby="layersTitle">
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between">
+      <h2 id="layersTitle">Score each layer</h2>
+      <p class="rules">Tap a currency: <span class="num">0 → + → − → 0</span>. Weight shows how much a layer counts.</p>
+    </div>
+    <div id="layers" class="layers"></div>
+  </section>
+
+  <section class="notes">
+    <div class="note">
+      <h3>After the session · TradeZella</h3>
+      <ul>
+        <li>Sync MT5 automatically and tag every trade with its <strong>pair bias score</strong> and setup (A–E).</li>
+        <li>Weekly: compare trades with bias 6+ against 3–5. If the strong-bias trades don't earn more R, re-weight the layers.</li>
+        <li>Build one Playbook per setup and backtest it on forex data before trading it live.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>Rules that override the score</h3>
+      <ul>
+        <li>No entries 15 minutes either side of red news on either currency (MT5 shows the windows).</li>
+        <li>Pair bias under 3: no trade. 3–5: half size. 6+: full size (1% risk).</li>
+        <li>Stop for the day at −2% or after 3 trades.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>Left out</h3>
+      <ul>
+        <li><strong>Click.Trade</strong> trades Solana memecoin pools (Raydium, Meteora, Pumpswap). It has no forex market, so it adds nothing to a forex bias.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var CUR = ["USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"];
+  // market convention: the currency earlier in this list is quoted as the base
+  var ORDER = ["EUR", "GBP", "AUD", "NZD", "USD", "CAD", "CHF", "JPY"];
+  var RISK = { on: { AUD: 1, NZD: 1, CAD: 1, JPY: -1, CHF: -1, USD: -1 }, off: { AUD: -1, NZD: -1, CAD: -1, JPY: 1, CHF: 1, USD: 1 } };
+
+  var LAYERS = [
+    { id: "rates", w: 2, name: "Rate differentials", when: "09:00",
+      tools: [["Koyfin", "https://www.koyfin.com/"]],
+      how: "Chart each country's 2-year government yield minus the US 2-year (for EUR: Germany 2Y − US 2Y). Spread moving in the currency's favour this week = +, against = −. For USD, use the US 2-year and the dollar index." },
+    { id: "news", w: 2, name: "Central banks and headlines", when: "09:00, then live",
+      tools: [["Benzinga Pro", "https://www.benzinga.com/pro/"]],
+      how: "Audio squawk and headlines. Hawkish central-bank talk, hot inflation or strong jobs data = +. Dovish talk, weak data or intervention warnings = −." },
+    { id: "cot", w: 1, name: "Positioning (COT and open interest)", when: "Weekend (COT data comes out Friday)",
+      tools: [["Finviz currency futures", "https://finviz.com/futures_charts?t=CURRENCIES&p=d"], ["Interactive Brokers", "https://www.interactivebrokers.com/"]],
+      how: "Large speculators adding net longs in the currency's futures = +, adding net shorts = −. In IBKR, rising open interest in the CME future while price rises confirms the move. After a long one-way run, leave it at 0: that crowding is a reversal risk." },
+    { id: "flow", w: 1, name: "Options flow on currency ETFs", when: "Previous US session (16:30–23:00)",
+      tools: [["Unusual Whales", "https://unusualwhales.com/"]],
+      how: "Large call sweeps or blocks = +, large put buying = −. UUP = USD, FXE = EUR, FXB = GBP, FXY = JPY, FXA = AUD, FXC = CAD, FXF = CHF. There is no NZD fund: leave NZD at 0." },
+    { id: "risk", w: 1, name: "Risk mood", when: "09:00, recheck 16:30", auto: true,
+      tools: [["Koyfin", "https://www.koyfin.com/"], ["Trade Ideas", "https://www.trade-ideas.com/"]],
+      how: "Koyfin: S&P 500 futures and VIX. Trade Ideas: relative volume in defensive ETFs (XLU, XLP) against cyclical ones (XLK, XLY). Set the switch and the row fills itself: risk-on lifts AUD, NZD, CAD and weighs on JPY, CHF, USD; risk-off does the reverse." },
+    { id: "trend", w: 1, name: "Higher-timeframe trend", when: "Weekend, check at 09:00",
+      tools: [["TrendSpider", "https://trendspider.com/"], ["Finviz forex performance", "https://finviz.com/forex_performance"]],
+      how: "TrendSpider multi-timeframe analysis and automatic trendlines on the daily and 4-hour charts. Finviz forex performance for the week and month. Currency trending up against most others = +, down = −." },
+    { id: "intra", w: 2, name: "Today's strength", when: "09:30 and 14:30 (winter 10:30 and 15:30)",
+      tools: [["MetaTrader 5 · FX Daily System", "https://www.metatrader5.com/"]],
+      how: "From the MT5 panel's currency strength: top 3 = +, bottom 3 = −, middle two = 0." }
+  ];
+
+  var EXAMPLE = {
+    risk: "off",
+    rates: { USD: 1, EUR: -1, GBP: 1, JPY: 1, AUD: -1, NZD: -1, CAD: 0, CHF: 0 },
+    news: { USD: 1, EUR: 0, GBP: 1, JPY: 0, AUD: -1, NZD: 0, CAD: -1, CHF: 0 },
+    cot: { USD: 0, EUR: -1, GBP: 1, JPY: 1, AUD: -1, NZD: 0, CAD: 0, CHF: 0 },
+    flow: { USD: 1, EUR: 0, GBP: 0, JPY: 1, AUD: -1, NZD: 0, CAD: 0, CHF: 0 },
+    trend: { USD: 1, EUR: -1, GBP: 1, JPY: 0, AUD: -1, NZD: -1, CAD: 0, CHF: 1 },
+    intra: { USD: 1, EUR: -1, GBP: 1, JPY: 1, AUD: -1, NZD: -1, CAD: 0, CHF: 0 }
+  };
+
+  // --- Nairobi time and sessions ---------------------------------------
+  function lastSunday(y, m) { var d = new Date(Date.UTC(y, m + 1, 0)); return Date.UTC(y, m, d.getUTCDate() - d.getUTCDay()); }
+  function nthSunday(y, m, n) { var d = new Date(Date.UTC(y, m, 1)); return Date.UTC(y, m, 1 + (7 - d.getUTCDay()) % 7 + 7 * (n - 1)); }
+  function ukSummer(t) { var y = new Date(t).getUTCFullYear(); return t >= lastSunday(y, 2) + 36e5 && t < lastSunday(y, 9) + 36e5; }
+  function usSummer(t) { var y = new Date(t).getUTCFullYear(); return t >= nthSunday(y, 2, 2) + 7 * 36e5 && t < nthSunday(y, 10, 1) + 6 * 36e5; }
+  function nairobi(t) { return new Date(t + 3 * 36e5); }
+  function hhmm(t) { var d = nairobi(t); return pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function dur(ms) { var m = Math.round(ms / 6e4); return (m >= 60 ? Math.floor(m / 60) + "h " : "") + (m % 60) + "m"; }
+  function todayKey() { return nairobi(Date.now()).toISOString().slice(0, 10); }
+
+  function sessionText(t) {
+    var day = Math.floor(t / 864e5) * 864e5;
+    var lo = day + (ukSummer(t) ? 7 : 8) * 36e5, lc = lo + 9 * 36e5;
+    var ny = day + (usSummer(t) ? 12 : 13) * 36e5, nc = ny + 9 * 36e5;
+    var dow = nairobi(t).getUTCDay();
+    if (dow === 0 || dow === 6) return ["Weekend: review the week", false];
+    if (t < lo) return ["London opens " + hhmm(lo) + " · in " + dur(lo - t), false];
+    if (t < ny) return ["London session · New York " + hhmm(ny), true];
+    if (t < lc) return ["London–New York overlap until " + hhmm(lc), true];
+    if (t < nc) return ["New York session until " + hhmm(nc), true];
+    return ["Markets quiet · rollover spreads", false];
+  }
+
+  // --- state -----------------------------------------------------------
+  function blank() {
+    var s = { risk: "neutral" };
+    LAYERS.forEach(function (l) { if (!l.auto) { s[l.id] = {}; CUR.forEach(function (c) { s[l.id][c] = 0; }); } });
+    return s;
+  }
+  var isExample = false;
+  var state = load();
+
+  function load() {
+    try {
+      var raw = localStorage.getItem("fxbias:" + todayKey());
+      if (raw) return JSON.parse(raw);
+    } catch (e) { /* storage unavailable: fall back to the example */ }
+    isExample = true;
+    return JSON.parse(JSON.stringify(EXAMPLE));
+  }
+  function save() {
+    if (isExample) return;
+    try { localStorage.setItem("fxbias:" + todayKey(), JSON.stringify(state)); } catch (e) { /* not saved; page still works */ }
+  }
+  function value(layer, c) {
+    if (layer.auto) return (RISK[state.risk] || {})[c] || 0;
+    return (state[layer.id] || {})[c] || 0;
+  }
+  function scores() {
+    var out = {};
+    CUR.forEach(function (c) { out[c] = LAYERS.reduce(function (sum, l) { return sum + l.w * value(l, c); }, 0); });
+    return out;
+  }
+
+  // --- render ----------------------------------------------------------
+  var SYM = { "1": "+", "0": "·", "-1": "−" };
+
+  function renderLayers() {
+    var root = document.getElementById("layers");
+    root.innerHTML = "";
+    LAYERS.forEach(function (l) {
+      var el = document.createElement("article");
+      el.className = "layer";
+      var tools = l.tools.map(function (t) { return '<a href="' + t[1] + '" target="_blank" rel="noopener">' + t[0] + "</a>"; }).join("");
+      el.innerHTML =
+        '<div class="layer-head"><h3>' + l.name + '</h3><span class="weight">×' + l.w + '</span><span class="when">' + l.when + "</span></div>" +
+        '<div class="tools">' + tools + "</div>" +
+        '<p class="how">' + l.how + "</p>";
+      if (l.auto) {
+        var seg = document.createElement("div");
+        seg.className = "seg";
+        seg.setAttribute("role", "group");
+        seg.setAttribute("aria-label", "Risk mood");
+        [["off", "Risk-off"], ["neutral", "Neutral"], ["on", "Risk-on"]].forEach(function (o) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.id = "risk-" + o[0];
+          b.textContent = o[1];
+          b.setAttribute("aria-pressed", String(state.risk === o[0]));
+          b.addEventListener("click", function () { edit(function () { state.risk = o[0]; }); });
+          seg.appendChild(b);
+        });
+        el.appendChild(seg);
+      }
+      var cells = document.createElement("div");
+      cells.className = "cells";
+      CUR.forEach(function (c) {
+        var v = value(l, c);
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "cell";
+        b.id = l.id + "-" + c;
+        b.dataset.v = String(v);
+        b.setAttribute("aria-label", l.name + " " + c + ": " + (v > 0 ? "bullish" : v < 0 ? "bearish" : "neutral"));
+        b.innerHTML = '<span class="c">' + c + '</span><span class="s">' + SYM[String(v)] + "</span>";
+        if (l.auto) b.disabled = true;
+        else b.addEventListener("click", function () {
+          edit(function () { var cur = state[l.id][c] || 0; state[l.id][c] = cur === 0 ? 1 : cur === 1 ? -1 : 0; });
+        });
+        cells.appendChild(b);
+      });
+      el.appendChild(cells);
+      root.appendChild(el);
+    });
+  }
+
+  function renderSummary() {
+    var s = scores();
+    var sorted = CUR.slice().sort(function (a, b) { return s[b] - s[a]; });
+    document.getElementById("bars").innerHTML = sorted.map(function (c) {
+      var v = s[c], w = Math.min(50, Math.abs(v) / 10 * 50);
+      return '<div class="bar"><span class="code">' + c + '</span><span class="track"><span class="fill ' + (v >= 0 ? "pos" : "neg") +
+        '" style="width:' + w + '%"></span></span><span class="val num">' + (v > 0 ? "+" : "") + v + "</span></div>";
+    }).join("");
+
+    var pairs = [];
+    for (var i = 0; i < ORDER.length; i++)
+      for (var j = i + 1; j < ORDER.length; j++) {
+        var b = ORDER[i], q = ORDER[j], bias = s[b] - s[q];
+        pairs.push({ name: b + q, bias: bias, b: b, q: q });
+      }
+    pairs.sort(function (x, y) { return Math.abs(y.bias) - Math.abs(x.bias); });
+    var top = pairs.filter(function (p) { return Math.abs(p.bias) >= 3; }).slice(0, 3);
+    document.getElementById("pairs").innerHTML = top.length ? top.map(function (p) {
+      var buy = p.bias > 0, strong = Math.abs(p.bias) >= 6;
+      return '<div class="pair"><strong><span class="' + (buy ? "side-buy" : "side-sell") + '">' + (buy ? "BUY " : "SELL ") + "</span>" + p.name +
+        '</strong><span class="grade chip' + (strong ? " live" : "") + '">' + (strong ? "Full size" : "Half size") + " · " + (p.bias > 0 ? "+" : "") + p.bias +
+        "</span><small>" + (buy ? p.b + " strong, " + p.q + " weak" : p.q + " strong, " + p.b + " weak") + ". Wait for MT5 to confirm it as a pick and for an A–E setup.</small></div>";
+    }).join("") : '<p class="none">No pair reaches a bias of 3. No trade today is a valid result.</p>';
+
+    document.getElementById("mt5str").textContent = CUR.map(function (c) { return c + (s[c] >= 0 ? "+" : "") + s[c]; }).join(",");
+  }
+
+  function render() {
+    document.getElementById("exampleBanner").hidden = !isExample;
+    renderLayers();
+    renderSummary();
+  }
+
+  function edit(fn) {
+    if (isExample) { state = blank(); isExample = false; }
+    fn();
+    save();
+    render();
+  }
+
+  function tick() {
+    var now = Date.now(), st = sessionText(now), chip = document.getElementById("session");
+    document.getElementById("clock").textContent = hhmm(now);
+    chip.textContent = st[0];
+    chip.className = "chip" + (st[1] ? " live" : "");
+    var d = nairobi(now);
+    document.getElementById("today").textContent = d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  }
+
+  document.getElementById("clearBtn").addEventListener("click", function () { state = blank(); isExample = false; save(); render(); });
+  document.getElementById("copyBtn").addEventListener("click", function () {
+    var text = document.getElementById("mt5str").textContent, msg = document.getElementById("copyMsg");
+    function fallback() {
+      var r = document.createRange(); r.selectNodeContents(document.getElementById("mt5str"));
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      msg.textContent = "Selected. Copy it with your keyboard or long-press.";
+    }
+    try {
+      navigator.clipboard.writeText(text).then(function () { msg.textContent = "Copied. Paste it into InpBias in MT5."; }, fallback);
+    } catch (e) { fallback(); }
+  });
+
+  render();
+  tick();
+  setInterval(tick, 30000);
+})();
+</script>

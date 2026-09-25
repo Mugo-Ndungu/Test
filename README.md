@@ -1,49 +1,71 @@
 # FX Daily System (Nairobi)
 
-A forex day-trading system built only on the **free** platforms from the
-"Trading platforms that will make you 10k/mo" list. All times are **Nairobi (EAT, UTC+3)**.
+A forex day-trading system that combines the platforms from the "Trading platforms that
+will make you 10k/mo" list. Each platform answers a different question about the market.
+You score those answers into one **daily bias**, and MetaTrader 5 only lets through trades
+that agree with it. All times are **Nairobi (EAT, UTC+3)**.
 
-- `mt5/FX_Daily_System.mq5`: a MetaTrader 5 program that runs the morning routine
-  for you. It never places trades.
-- This README: which platforms are used and why, the daily schedule, the setups,
-  the risk rules and the installation steps.
+- **[Bias Scorecard](https://claude.ai/artifact/JV5vQefpof3cUgLxNwbSRG)** (also `bias/scorecard.html`):
+  score each currency across 7 layers every morning, see the pairs to focus on, and copy the
+  bias into MT5.
+- `mt5/FX_Daily_System.mq5`: the MT5 program. It applies your bias, and handles news windows,
+  currency strength, ADR, levels, picks, lot sizes, alerts and the journal. It never places trades.
 
 > Not financial advice. Most retail forex traders lose money. Run this on an MT5
 > **demo account** for at least 20 trading days before using real money.
 
 ---
 
-## 1. The 10 platforms: what is free and what each one does here
+## 1. How the platforms combine
 
-| # | Platform | Free? | Forex? | Used in the system as |
-|---|---|---|---|---|
-| 8 | **MetaTrader 5** | Yes, the platform and demo accounts are free | Yes | **The core.** Charts, execution, built-in economic calendar, runs `FX_Daily_System`, push alerts to your phone |
-| 6 | **Finviz** (free version) | Yes (delayed data; Elite is paid) | Forex performance page, currency futures charts, economic calendar | Second opinion on currency strength and the calendar |
-| 10 | **Koyfin** (free plan) | Yes | Forex, macro dashboards, economic calendar with forecasts | "FX Morning" dashboard: dollar index, US 10-year yield, S&P 500, VIX, gold, oil |
-| 9 | **Benzinga** (free benzinga.com, not Pro) | benzinga.com is free; Pro is paid (14-day trial) | Forex news section, economic calendar | Why a currency is moving (news behind the strength) |
-| 4 | **Interactive Brokers** | Free paper-trading account; no minimum for a cash account | Yes | Optional. Only if you want IBKR as your broker. It does **not** run MT5, so this program won't work there |
-| 2 | TrendSpider | **No** (paid 14-day trial, plans from about $54/month) | Not needed | Not used |
-| 3 | Trade Ideas | Paid | **No**, US stocks only | Not used |
-| 5 | TradeZella | **No** (7-day trial only) | Yes | Not used. The MT5 program writes your trade journal instead |
-| 7 | Unusual Whales | Limited, delayed free tier | Stock options flow; forex data only in paid API | Not used |
-| 1 | ClickTrade (Click.Trade) | Unknown | Unknown | Not used. The site gives no details of features or pricing. **Do not confuse it with "ClickTrades"**, a separate offshore broker (Seychelles) with many complaints |
+The edge comes from agreement between different kinds of evidence: interest rates
+(fundamentals), positioning, news, risk mood, trend and today's price action. When most layers
+point the same way for a currency, you trade it against the currency where most point the other way.
 
-**Broker:** MT5 runs through a broker. From Kenya, use a broker licensed by the
-**Capital Markets Authority (CMA)** that offers MT5. Open a demo account there first.
+| Layer (weight) | Question it answers | Platform and what exactly to use | When (Nairobi) |
+|---|---|---|---|
+| **Rate differentials** (×2) | Where is money being pulled by interest rates? | **Koyfin**: charts of each country's 2-year yield minus the US 2-year (e.g. Germany 2Y − US 2Y for EUR), US 10-year, dollar index. Custom formulas and dashboards | 09:00 |
+| **Central banks and headlines** (×2) | What's driving the currency today? | **Benzinga Pro**: audio squawk and real-time headlines on central banks, data and geopolitics | 09:00, then live |
+| **Positioning** (×1) | Who is already long or short? | **Finviz**: currency futures pages (COT data). **Interactive Brokers**: CME currency futures volume and open interest in TWS; the only *real* volume in forex | Weekend (COT is released Friday) |
+| **Options flow** (×1) | Are big players betting on a move? | **Unusual Whales**: sweeps and blocks on currency funds: UUP (USD), FXE (EUR), FXB (GBP), FXY (JPY), FXA (AUD), FXC (CAD), FXF (CHF) | Previous US session, 16:30–23:00 |
+| **Risk mood** (×1) | Risk-on or risk-off? | **Koyfin**: S&P 500 futures, VIX. **Trade Ideas**: relative volume in defensive (XLU, XLP) vs cyclical (XLK, XLY) funds and in the currency funds | 09:00, recheck 16:30 |
+| **Higher-timeframe trend** (×1) | Which way is the bigger trend? | **TrendSpider**: multi-timeframe analysis, automatic trendlines, seasonality by hour/day/month. **Finviz**: forex performance by week and month | Weekend, check at 09:00 |
+| **Today's strength** (×2) | What is price actually doing today? | **MetaTrader 5** (FX Daily System panel): currency strength across 20 pairs | 09:30 and 14:30 |
+| **Review** | Does the bias actually give an edge? | **TradeZella**: MT5 auto-sync, tag each trade with its bias score and setup, playbooks, backtesting on forex data | After 19:00, weekends |
+| Execution | | **MetaTrader 5** through your broker. **Interactive Brokers** as an alternative broker (it doesn't run MT5) | |
 
-Sources: [TrendSpider pricing (StockBrokers.com)](https://www.stockbrokers.com/review/tools/trendspider),
-[Trade Ideas review (propfirmapp)](https://propfirmapp.com/trading-tools/trade-ideas),
-[TradeZella pricing](https://www.tradezella.com/blog/tradezella-pricing),
-[Unusual Whales pricing](https://unusualwhales.com/pricing),
-[MQL5 economic calendar functions](https://www.mql5.com/en/docs/calendar),
+**Left out: Click.Trade.** It trades Solana memecoin pools (Raydium, Meteora, Pumpswap)
+and has no forex market. Don't confuse it with "ClickTrades", an offshore broker
+(Seychelles) with many complaints.
+
+**Scoring.** Each layer gives each currency +1, 0 or −1, multiplied by its weight, so a
+currency scores from −10 to +10. **Pair bias = base score − quote score.**
+- Under 3: no trade.
+- 3–5: half size.
+- 6 or more: full size.
+
+The scorecard lists the strongest-vs-weakest pairs. Paste its bias string into MT5 and the
+program skips any pick with a bias under 3 or one that points against the trade.
+
+**Cost.** MT5, Finviz and Koyfin have useful free versions. Interactive Brokers costs nothing
+to open. TrendSpider, Trade Ideas, TradeZella, Benzinga Pro and Unusual Whales are paid, with
+trials or limited free tiers. If you drop one, set its row to 0 and the rest still work.
+
+**Broker.** From Kenya, use an MT5 broker licensed by the **Capital Markets Authority (CMA)**.
+
+Sources: [Koyfin fixed income and yields](https://www.koyfin.com/data-coverage/fixed-income/),
+[Koyfin custom formulas](https://www.koyfin.com/help/custom-formulas/),
+[Benzinga Pro squawk](https://www.benzinga.com/pro/feature/squawk),
 [Finviz forex performance](https://finviz.com/forex_performance),
-[Finviz currency futures charts](https://finviz.com/futures_charts?t=CURRENCIES&p=d),
-[Koyfin free plan (Bullish Bears)](https://bullishbears.com/koyfin-review/),
-[Benzinga forex news](https://www.benzinga.com/markets/forex),
-[Benzinga economic calendar](https://www.benzinga.com/calendars/economic),
-[IBKR paper trading](https://www.interactivebrokers.com/campus/trading-lessons/how-to-open-an-ibkr-paper-trading-account/),
-[Click.Trade](https://click.trade/en),
-[ClickTrades review (Forex Peace Army)](https://www.forexpeacearmy.com/forex-reviews/16198/clicktrades-review).
+[Finviz currency futures](https://finviz.com/futures_charts?t=CURRENCIES&p=d),
+[IBKR market scanners](https://interactivebrokers.com/en/?f=%2Fen%2Fsoftware%2Fpdfhighlights%2FPDF-marketscanners.php),
+[CME FX volume and open interest](https://www.cmegroup.com/market-data/browse-data/fx-volume.html),
+[Unusual Whales flow alerts](https://unusualwhales.com/option-flow-alerts),
+[Trade Ideas relative volume](https://www.trade-ideas.com/learning-center/stock-scanning/relative-volume-scanner-strategies/),
+[TrendSpider charting](https://trendspider.com/product/analyze-and-chart-any-market-asset/),
+[TradeZella MT4/MT5 auto-sync](https://www.tradezella.com/blog/metatrader-4-and-metatrader-5-broker-auto-sync),
+[MQL5 economic calendar](https://www.mql5.com/en/docs/calendar),
+[Click.Trade (Latitude.sh case study)](https://www.latitude.sh/customers/click-trade).
 
 ---
 
@@ -79,23 +101,24 @@ The exact list for each day comes from the MT5 calendar, and the program shows i
 
 | Time | What you do | Platform |
 |---|---|---|
-| **09:00 (10:00)** | Open MT5. The program has already run steps 1–5 (see below). Read the panel | MT5 |
-| **09:30 (10:30)** | Push brief arrives on your phone: picks + today's red news | MT5 mobile |
-| 09:00 – 09:40 | **Cross-check, 10 minutes:** | |
-| | a) Does the strongest/weakest currency on the **Finviz forex performance** page agree with the MT5 panel? If they disagree, trade half size or skip | Finviz |
-| | b) **Koyfin "FX Morning" dashboard:** dollar index and US 10-year yield rising → USD strength is backed. S&P 500 falling + VIX rising (risk-off) → JPY/CHF strong, AUD/NZD weak. Does that fit the picks? | Koyfin |
-| | c) **Benzinga forex news:** find the headline behind the strongest and weakest currency. No news behind the move → it's more likely to fade: use setup B or skip | Benzinga |
-| 09:40 – 10:00 | Open a 15-minute chart for each pick. The levels appear automatically. Write your entry, stop and target | MT5 |
-| **10:00 – 13:00 (11:00 – 14:00)** | **London window:** setups A and B | MT5 |
-| 13:00 – 15:00 | Manage open trades. Mind BoE 14:00 / ECB 15:15 on those days | MT5 |
-| **14:30 (15:30)** | Second push brief before New York | MT5 mobile |
+| **Weekend** | Positioning: COT on the Finviz currency futures pages, CME open interest in IBKR. Higher-timeframe trend: TrendSpider daily/4-hour trendlines and seasonality for your pairs, Finviz week/month performance. Enter these two rows in the scorecard on Monday. Review last week in TradeZella. Check next week's red events in the MT5 calendar | Finviz, IBKR, TrendSpider, TradeZella, MT5 |
+| **08:30 – 09:00 (09:30 – 10:00)** | **Rate differentials:** open the Koyfin dashboard with the 2-year yield spreads, US 10-year and dollar index. **Risk mood:** S&P 500 futures and VIX on Koyfin | Koyfin |
+| 08:30 – 09:00 | **News:** Benzinga Pro headlines since the US close; turn on the squawk. **Options flow:** last US session's sweeps and blocks on UUP, FXE, FXB, FXY, FXA, FXC, FXF | Benzinga Pro, Unusual Whales |
+| **09:00 – 09:30 (10:00 – 10:30)** | **Today's strength** from the MT5 panel. Score all 7 rows in the **Bias Scorecard**, then copy the bias string into MT5 (FX_Daily_System inputs → InpBias) | Scorecard, MT5 |
+| **09:30 (10:30)** | Push brief on your phone: picks that pass your bias, plus today's red news | MT5 mobile |
+| 09:30 – 10:00 | Open a 15-minute chart for each pick; levels appear automatically. In TrendSpider, check the pick's trendlines on the same timeframe. Write entry, stop and target | MT5, TrendSpider |
+| **10:00 – 13:00 (11:00 – 14:00)** | **London window:** setups A and B. Squawk on | MT5, Benzinga Pro |
+| 13:00 – 15:00 | Manage open trades. Watch for BoE at 14:00 and ECB at 15:15 on meeting days | MT5 |
+| **14:30 (15:30)** | Second brief. Update **Today's strength** in the scorecard and re-paste if a currency flipped | MT5, Scorecard |
 | **15:30 (16:30)** | US data. No entries 15:15 – 15:45 | MT5 alert |
+| **16:30 (17:30)** | US stock market opens: recheck **risk mood** with Trade Ideas relative volume (defensive vs cyclical funds, currency funds) and live Unusual Whales flow on currency funds | Trade Ideas, Unusual Whales |
 | **15:45 – 19:00 (16:45 – 20:00)** | **Overlap window:** setups C, D, E | MT5 |
-| **19:00 (20:00)** | No new trades. Journal: fill in "Setup" and "Followed plan" in `FX_Journal.csv` | MT5 / Excel |
-| **Weekend** | Weekly review of the journal. Check next week's red events (MT5 calendar, week view) | MT5 |
+| **19:00 (20:00)** | No new trades. In TradeZella, tag each synced trade with its setup and pair bias score | TradeZella |
 
-### What the MT5 program does automatically (steps 1–5)
+### What the MT5 program does automatically
 
+0. **Your bias:** skips any pair whose bias from the scorecard points against the trade or is
+   below 3, and ranks stronger-bias pairs higher.
 1. **News:** reads today's **high-impact** events from the MT5 economic calendar for the
    8 major currencies, shows each with its no-entry window (±15 min) and flags picks inside
    a window **now**. Sends a push alert 30 minutes before red news on any pick.
@@ -162,9 +185,13 @@ skip it or use half size.
 
 ---
 
-## 6. Journal (replaces TradeZella)
+## 6. Journal (TradeZella plus a backup CSV)
 
-Every closed trade is written to `MQL5\Files\FX_Journal.csv` (in MT5: File → Open Data Folder
+TradeZella is the main journal: connect MT5 auto-sync and tag every trade with its **setup
+(A–E)** and **pair bias score**. Each week, compare trades with bias 6+ against trades with
+bias 3–5. If the strong-bias trades don't earn more R, change the layer weights.
+
+As a backup that always works, every closed trade is also written to `MQL5\Files\FX_Journal.csv` (in MT5: File → Open Data Folder
 → MQL5 → Files). Each row has: date, open and close time (Nairobi), session, pair, side, lots,
 entry, exit, stop, pips, profit, **R multiple**, and whether it was a system pick. Two columns
 are for you to fill in: **Setup (A–E)** and **Followed plan (Y/N)**.
@@ -188,6 +215,10 @@ Open it in Excel or Google Sheets every weekend and answer:
    - `InpSuffix`: if your broker's symbols look like `EURUSDm` or `EURUSD.pro`, enter `m` or `.pro`.
    - Gold: if your broker calls it `GOLD`, change `XAUUSD` in `InpPairs` to `XAUUSD=GOLD`.
    - `InpRiskPct`, `InpDailyStopPct`, `InpMaxTrades`: your risk rules.
+   - `InpBias`: paste today's string from the Bias Scorecard, for example
+     `USD+9,EUR-6,GBP+8,JPY+7,AUD-10,NZD-6,CAD-3,CHF+2`. To change it during the day, open the
+     program's properties (double-click it in the chart's top-right corner or press F7 on the chart).
+     `InpMinBias` (default 3) is the minimum pair bias a pick needs.
 6. **Phone alerts:** install the MT5 mobile app, then go to Settings → Messages and copy your
    **MetaQuotes ID**. In desktop MT5, go to Tools → Options → Notifications, tick "Enable push
    notifications", paste the ID and press Test.
